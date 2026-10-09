@@ -1,0 +1,2692 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Simulador de Campo Eléctrico y Líneas Equipotenciales | Física Universitaria</title>
+  <meta name="description" content="Simulador interactivo avanzado de electromagnetismo: líneas de campo eléctrico, curvas equipotenciales mediante Marching Squares, sensor espacial y módulo de autoevaluación.">
+  
+  <!-- Google Fonts & KaTeX for LaTeX rendering -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+
+  <style>
+    /* ==========================================================================
+       1. VARIABLES Y SISTEMA DE DISEÑO (DARK MODE PREMIUM & GLASSMORFISMO)
+       ========================================================================== */
+    :root {
+      --bg-space: #070a13;
+      --bg-panel: rgba(15, 23, 42, 0.78);
+      --bg-panel-hover: rgba(30, 41, 59, 0.88);
+      --bg-card: rgba(17, 24, 39, 0.65);
+      --border-glass: rgba(255, 255, 255, 0.08);
+      --border-glass-glow: rgba(56, 189, 248, 0.3);
+      
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      
+      /* Cargas y campos */
+      --color-pos: #ff4757;
+      --color-pos-glow: rgba(255, 71, 87, 0.45);
+      --color-neg: #00d2d3;
+      --color-neg-glow: rgba(0, 210, 211, 0.45);
+      --color-zero: #10b981;
+      --color-sensor: #f59e0b;
+      --color-sensor-glow: rgba(245, 158, 11, 0.4);
+      --color-accent: #6366f1;
+      --color-accent-light: #818cf8;
+
+      --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      --sidebar-width: 380px;
+      --transition-smooth: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-space);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+    }
+
+    /* Scrollbars elegantes */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.5);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.45);
+    }
+
+    /* ==========================================================================
+       2. CONTENEDOR PRINCIPAL Y CANVAS
+       ========================================================================== */
+    #app-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      overflow: hidden;
+    }
+
+    #canvas-viewport {
+      position: relative;
+      flex: 1;
+      height: 100%;
+      background: radial-gradient(circle at 50% 50%, #0c1427 0%, #060913 100%);
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    #sim-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* ==========================================================================
+       3. TOPBAR FLOTANTE (ESTADO RÁPIDO & ACCIONES)
+       ========================================================================== */
+    .floating-topbar {
+      position: absolute;
+      top: 16px;
+      left: 20px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--bg-panel);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-glass);
+      border-radius: 14px;
+      padding: 8px 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+      max-width: calc(100% - 40px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-right: 1px solid var(--border-glass);
+      padding-right: 14px;
+    }
+
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #ff4757, #6366f1);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 16px;
+      box-shadow: 0 0 16px rgba(255, 71, 87, 0.4);
+    }
+
+    .brand-text h1 {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+      white-space: nowrap;
+      background: linear-gradient(90deg, #ffffff, #cbd5e1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .brand-text span {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: block;
+    }
+
+    .quick-stats {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .quick-stats .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .quick-stats .stat-val {
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+    /* Botón Guía y Manual */
+    .topbar-btn {
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.35);
+      color: #c7d2fe;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: var(--transition-smooth);
+    }
+    .topbar-btn:hover {
+      background: rgba(99, 102, 241, 0.3);
+      border-color: rgba(99, 102, 241, 0.6);
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    .topbar-btn.green {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.35);
+      color: #6ee7b7;
+    }
+    .topbar-btn.green:hover {
+      background: rgba(16, 185, 129, 0.3);
+      border-color: rgba(16, 185, 129, 0.6);
+      color: #ffffff;
+    }
+
+    /* ==========================================================================
+       4. HERRAMIENTAS FLOTANTES INFERIORES EN CANVAS (HUD DE MEDIDOR Y ZOOM)
+       ========================================================================== */
+    .canvas-hud-bottom {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--bg-panel);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-glass);
+      border-radius: 12px;
+      padding: 8px 14px;
+      font-size: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .scale-ruler {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      border-right: 1px solid var(--border-glass);
+      padding-right: 12px;
+    }
+    .ruler-bar {
+      width: 60px;
+      height: 4px;
+      background: #64748b;
+      position: relative;
+    }
+    .ruler-bar::before, .ruler-bar::after {
+      content: '';
+      position: absolute;
+      top: -3px;
+      width: 2px;
+      height: 10px;
+      background: #64748b;
+    }
+    .ruler-bar::before { left: 0; }
+    .ruler-bar::after { right: 0; }
+
+    .zoom-controls {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .icon-btn {
+      width: 28px;
+      height: 28px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-glass);
+      border-radius: 6px;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 14px;
+      transition: var(--transition-smooth);
+    }
+    .icon-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    /* Badge flotante de sonda en tiempo real */
+    #sensor-hud {
+      position: absolute;
+      pointer-events: none;
+      z-index: 25;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--color-sensor);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      box-shadow: 0 4px 20px rgba(245, 158, 11, 0.35);
+      transform: translate(18px, 18px);
+      transition: opacity 0.15s ease;
+      min-width: 175px;
+    }
+    #sensor-hud .title {
+      font-weight: 700;
+      color: var(--color-sensor);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(245, 158, 11, 0.2);
+      padding-bottom: 3px;
+    }
+    #sensor-hud .hud-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 2px 0;
+      color: var(--text-muted);
+    }
+    #sensor-hud .hud-val {
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+    /* ==========================================================================
+       5. PANEL LATERAL (SIDEBAR DE CONTROL CIENTÍFICO)
+       ========================================================================== */
+    #sidebar {
+      width: var(--sidebar-width);
+      height: 100%;
+      background: var(--bg-panel);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-left: 1px solid var(--border-glass);
+      display: flex;
+      flex-direction: column;
+      z-index: 30;
+      box-shadow: -8px 0 32px rgba(0, 0, 0, 0.4);
+      overflow-y: auto;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .sidebar-section {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-glass);
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Botones de acción rápida: Agregar cargas */
+    .charge-actions-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .btn-charge {
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid transparent;
+      transition: var(--transition-smooth);
+    }
+
+    .btn-charge.pos {
+      background: rgba(255, 71, 87, 0.15);
+      border-color: rgba(255, 71, 87, 0.4);
+      color: #ff6b81;
+    }
+    .btn-charge.pos:hover {
+      background: rgba(255, 71, 87, 0.3);
+      border-color: #ff4757;
+      box-shadow: 0 0 16px var(--color-pos-glow);
+      color: #fff;
+      transform: translateY(-1px);
+    }
+
+    .btn-charge.neg {
+      background: rgba(0, 210, 211, 0.15);
+      border-color: rgba(0, 210, 211, 0.4);
+      color: #48dbfb;
+    }
+    .btn-charge.neg:hover {
+      background: rgba(0, 210, 211, 0.3);
+      border-color: #00d2d3;
+      box-shadow: 0 0 16px var(--color-neg-glow);
+      color: #fff;
+      transform: translateY(-1px);
+    }
+
+    /* Inspector de carga seleccionada */
+    .selected-charge-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-glass);
+      border-radius: 12px;
+      padding: 14px;
+      margin-top: 10px;
+      transition: var(--transition-smooth);
+    }
+    .selected-charge-card.active {
+      border-color: var(--border-glass-glow);
+      box-shadow: 0 4px 20px rgba(56, 189, 248, 0.15);
+    }
+    .selected-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .charge-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+    }
+    .charge-badge.positive {
+      background: rgba(255, 71, 87, 0.2);
+      color: #ff6b81;
+      border: 1px solid rgba(255, 71, 87, 0.4);
+    }
+    .charge-badge.negative {
+      background: rgba(0, 210, 211, 0.2);
+      color: #48dbfb;
+      border: 1px solid rgba(0, 210, 211, 0.4);
+    }
+
+    .btn-delete-charge {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: var(--transition-smooth);
+    }
+    .btn-delete-charge:hover {
+      background: rgba(239, 68, 68, 0.35);
+      color: #ffffff;
+      border-color: #ef4444;
+    }
+
+    /* Slider estilizado */
+    .slider-group {
+      margin: 10px 0;
+    }
+    .slider-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .slider-labels span.val-display {
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+    .styled-slider {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      background: #1e293b;
+      border-radius: 3px;
+      outline: none;
+      transition: background 0.2s;
+    }
+    .styled-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #6366f1;
+      border: 2px solid #ffffff;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(99, 102, 241, 0.6);
+      transition: transform 0.15s ease;
+    }
+    .styled-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    /* Toggles de Capas Científicas */
+    .toggle-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toggle-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-glass);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+    .toggle-item:hover {
+      background: var(--bg-panel-hover);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+    .toggle-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .toggle-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .toggle-title {
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .toggle-desc {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    /* Switch visual */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 20px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .switch-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #334155;
+      border-radius: 20px;
+      transition: 0.3s;
+    }
+    .switch-slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      border-radius: 50%;
+      transition: 0.3s;
+    }
+    input:checked + .switch-slider {
+      background-color: #6366f1;
+    }
+    input:checked + .switch-slider:before {
+      transform: translateX(18px);
+    }
+
+    /* Presets didácticos */
+    .presets-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .preset-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-glass);
+      border-radius: 8px;
+      padding: 9px 10px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: var(--transition-smooth);
+    }
+    .preset-btn:hover {
+      background: rgba(99, 102, 241, 0.2);
+      border-color: rgba(99, 102, 241, 0.5);
+      color: var(--text-main);
+      transform: translateY(-1px);
+    }
+
+    /* Panel de la Sonda / Sensor */
+    .sensor-card {
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      border-radius: 12px;
+      padding: 14px;
+    }
+    .sensor-readout-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 10px 0;
+      font-family: var(--font-mono);
+    }
+    .sensor-box {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(245, 158, 11, 0.15);
+      border-radius: 8px;
+      padding: 8px;
+    }
+    .sensor-box .label {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+    .sensor-box .val {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+    .sensor-work-tool {
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 10px;
+      font-size: 11px;
+    }
+    .work-btns {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .btn-small {
+      flex: 1;
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border-glass);
+      color: var(--text-main);
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+    .btn-small:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    /* ==========================================================================
+       6. MODAL / DRAWER PEDAGÓGICO DE AUTOEVALUACIÓN Y ACTIVIDADES
+       ========================================================================== */
+    .drawer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .drawer-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .learning-drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: min(640px, 94vw);
+      height: 100%;
+      background: #0d1527;
+      border-left: 1px solid rgba(99, 102, 241, 0.3);
+      z-index: 101;
+      box-shadow: -16px 0 48px rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .learning-drawer.open {
+      transform: translateX(0);
+    }
+
+    .drawer-header {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border-glass);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(15, 23, 42, 0.85);
+    }
+    .drawer-header h2 {
+      font-size: 18px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #ffffff;
+    }
+    .close-drawer-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border-glass);
+      color: var(--text-muted);
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      transition: var(--transition-smooth);
+    }
+    .close-drawer-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+    }
+
+    .drawer-content {
+      padding: 24px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .activity-card {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid var(--border-glass);
+      border-radius: 14px;
+      padding: 20px;
+      position: relative;
+    }
+    .activity-card.completed {
+      border-color: rgba(16, 185, 129, 0.5);
+    }
+    .activity-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: rgba(99, 102, 241, 0.2);
+      color: #a5b4fc;
+      margin-bottom: 10px;
+    }
+    .activity-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #ffffff;
+    }
+    .activity-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.55;
+      margin-bottom: 14px;
+    }
+    .activity-load-btn {
+      background: rgba(99, 102, 241, 0.18);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      color: #c7d2fe;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 16px;
+      transition: var(--transition-smooth);
+    }
+    .activity-load-btn:hover {
+      background: rgba(99, 102, 241, 0.35);
+      color: #ffffff;
+    }
+
+    /* Formulario de opciones de evaluación */
+    .quiz-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .quiz-option {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid var(--border-glass);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--text-main);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: var(--transition-smooth);
+    }
+    .quiz-option:hover {
+      background: rgba(51, 65, 85, 0.6);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .quiz-option.selected {
+      border-color: #6366f1;
+      background: rgba(99, 102, 241, 0.25);
+    }
+    .quiz-option.correct {
+      border-color: #10b981 !important;
+      background: rgba(16, 185, 129, 0.25) !important;
+      color: #6ee7b7;
+    }
+    .quiz-option.incorrect {
+      border-color: #ef4444 !important;
+      background: rgba(239, 68, 68, 0.25) !important;
+      color: #fca5a5;
+    }
+
+    .feedback-box {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1.5;
+      display: none;
+    }
+    .feedback-box.show {
+      display: block;
+    }
+    .feedback-box.success {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #a7f3d0;
+    }
+    .feedback-box.error {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: #fecaca;
+    }
+
+    /* Modal de Despliegue en la nube */
+    .deploy-modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.95);
+      width: min(650px, 92vw);
+      max-height: 85vh;
+      background: #0f172a;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 16px;
+      padding: 24px;
+      z-index: 150;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.25s ease;
+      overflow-y: auto;
+    }
+    .deploy-modal.open {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    .code-block {
+      background: #080d1a;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #38bdf8;
+      overflow-x: auto;
+      margin: 10px 0;
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      body {
+        flex-direction: column;
+      }
+      #sidebar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 55vh;
+        border-left: none;
+        border-top: 1px solid var(--border-glass);
+        transform: translateY(100%);
+      }
+      #sidebar.mobile-open {
+        transform: translateY(0);
+      }
+      .mobile-toggle-btn {
+        display: flex !important;
+      }
+    }
+
+    .mobile-toggle-btn {
+      display: none;
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 40;
+      background: #6366f1;
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 13px;
+      border: none;
+      box-shadow: 0 4px 20px rgba(99, 102, 241, 0.5);
+      cursor: pointer;
+    }
+
+    /* TeX Equation styling container */
+    .tex-block {
+      margin: 8px 0;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 8px;
+      text-align: center;
+      font-size: 14px;
+      border-left: 3px solid #6366f1;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="app-container">
+    <!-- VIEWPORT DEL CANVAS INTERACTIVO -->
+    <main id="canvas-viewport">
+      <canvas id="sim-canvas"></canvas>
+
+      <!-- BARRA SUPERIOR FLOTANTE -->
+      <header class="floating-topbar">
+        <div class="brand">
+          <div class="brand-icon">E</div>
+          <div class="brand-text">
+            <h1>SIMULADOR DE CAMPO ELÉCTRICO</h1>
+            <span>Líneas de Campo & Isosuperficies Equipotenciales</span>
+          </div>
+        </div>
+
+        <div class="quick-stats">
+          <div class="stat-item" title="Número total de cargas activas">
+            <span>Cargas:</span>
+            <span class="stat-val" id="stat-charge-count">0</span>
+          </div>
+          <div class="stat-item" title="Carga neta del sistema">
+            <span>Q Neta:</span>
+            <span class="stat-val" id="stat-net-charge">0 nC</span>
+          </div>
+        </div>
+
+        <button class="topbar-btn" id="btn-open-guide">
+          <span>📚</span>
+          <span>Guía & Evaluación</span>
+        </button>
+
+        <button class="topbar-btn green" id="btn-open-deploy">
+          <span>🚀</span>
+          <span>Despliegue Cloud</span>
+        </button>
+      </header>
+
+      <!-- HUD FLOTANTE DEL SENSOR / SONDA EN MOVIMIENTO -->
+      <div id="sensor-hud" style="display: none;">
+        <div class="title">
+          <span>⚡ SONDA ESPACIAL</span>
+          <span id="hud-coord">(0, 0) m</span>
+        </div>
+        <div class="hud-row">
+          <span>Potencial V:</span>
+          <span class="hud-val" id="hud-v">0.00 V</span>
+        </div>
+        <div class="hud-row">
+          <span>Campo |E|:</span>
+          <span class="hud-val" id="hud-e">0.00 V/m</span>
+        </div>
+        <div class="hud-row">
+          <span>Dirección θ:</span>
+          <span class="hud-val" id="hud-angle">0.0°</span>
+        </div>
+      </div>
+
+      <!-- HERRAMIENTAS INFERIORES DEL CANVAS (ESCALA Y CONTROLES) -->
+      <div class="canvas-hud-bottom">
+        <div class="scale-ruler">
+          <div class="ruler-bar"></div>
+          <span id="ruler-text">0.20 m</span>
+        </div>
+        <div class="zoom-controls">
+          <button class="icon-btn" id="btn-zoom-in" title="Acercar (+)">+</button>
+          <button class="icon-btn" id="btn-zoom-out" title="Alejar (-)">−</button>
+          <button class="icon-btn" id="btn-reset-view" title="Centrar cámara">⟲</button>
+          <button class="icon-btn" id="btn-clear-canvas" title="Limpiar todas las cargas">🗑️</button>
+          <button class="icon-btn" id="btn-export-img" title="Exportar Captura PNG">📸</button>
+        </div>
+      </div>
+
+      <!-- BOTÓN PARA MÓVILES -->
+      <button class="mobile-toggle-btn" id="btn-mobile-sidebar">⚙️ Controles</button>
+    </main>
+
+    <!-- PANEL LATERAL: CONTROLES CIENTÍFICOS Y GESTIÓN DE CARGAS -->
+    <aside id="sidebar">
+      
+      <!-- SECCIÓN 1: GESTIÓN DE CARGAS PUNTUALES -->
+      <section class="sidebar-section">
+        <div class="section-title">
+          <span>1. Gestión de Cargas</span>
+          <span style="font-size: 11px; color: var(--text-dim);">Drag & Drop en lienzo</span>
+        </div>
+        
+        <div class="charge-actions-grid">
+          <button class="btn-charge pos" id="btn-add-pos">
+            <span style="font-size: 18px; font-weight: 800;">+</span>
+            <span>Carga Positiva</span>
+          </button>
+          <button class="btn-charge neg" id="btn-add-neg">
+            <span style="font-size: 18px; font-weight: 800;">−</span>
+            <span>Carga Negativa</span>
+          </button>
+        </div>
+
+        <!-- Inspector de la carga seleccionada actualmente -->
+        <div class="selected-charge-card" id="charge-inspector">
+          <div class="selected-header">
+            <span class="charge-badge positive" id="inspector-badge">+1.0 nC</span>
+            <button class="btn-delete-charge" id="btn-delete-selected">
+              <span>✕</span> Eliminar Carga
+            </button>
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-labels">
+              <span>Magnitud (q)</span>
+              <span class="val-display" id="inspector-val-text">+1 nC</span>
+            </div>
+            <input type="range" class="styled-slider" id="charge-slider" min="-10" max="10" step="1" value="1">
+          </div>
+          
+          <div style="font-size: 11px; color: var(--text-dim); display: flex; justify-content: space-between;">
+            <span>Posición: <b id="inspector-pos" style="color: var(--text-muted);">(0.00, 0.00) m</b></span>
+            <span>Fuerza local: activa</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 2: VISUALIZACIÓN CIENTÍFICA (CAPAS TOGGLES) -->
+      <section class="sidebar-section">
+        <div class="section-title">
+          <span>2. Capas de Visualización</span>
+          <span style="font-size: 11px; color: var(--text-dim);">Filtros activos</span>
+        </div>
+
+        <div class="toggle-list">
+          <!-- Toggle Líneas de Campo -->
+          <label class="toggle-item">
+            <div class="toggle-info">
+              <div class="toggle-dot" style="background: #38bdf8; box-shadow: 0 0 8px #38bdf8;"></div>
+              <div>
+                <div class="toggle-title">Líneas de Campo Eléctrico (E)</div>
+                <div class="toggle-desc">Integración Runge-Kutta 2º orden con flechas direccionales</div>
+              </div>
+            </div>
+            <div class="switch">
+              <input type="checkbox" id="toggle-fieldlines" checked>
+              <span class="switch-slider"></span>
+            </div>
+          </label>
+
+          <!-- Toggle Curvas Equipotenciales -->
+          <label class="toggle-item">
+            <div class="toggle-info">
+              <div class="toggle-dot" style="background: #10b981; box-shadow: 0 0 8px #10b981;"></div>
+              <div>
+                <div class="toggle-title">Curvas Equipotenciales (V = cte)</div>
+                <div class="toggle-desc">Marching Squares: cálidos V>0, fríos V&lt;0, verde V=0</div>
+              </div>
+            </div>
+            <div class="switch">
+              <input type="checkbox" id="toggle-equipotentials" checked>
+              <span class="switch-slider"></span>
+            </div>
+          </label>
+
+          <!-- Toggle Rejilla de Vectores -->
+          <label class="toggle-item">
+            <div class="toggle-info">
+              <div class="toggle-dot" style="background: #a855f7;"></div>
+              <div>
+                <div class="toggle-title">Rejilla de Vectores de Campo</div>
+                <div class="toggle-desc">Vectores normalizados discretos en matriz 2D</div>
+              </div>
+            </div>
+            <div class="switch">
+              <input type="checkbox" id="toggle-vectors">
+              <span class="switch-slider"></span>
+            </div>
+          </label>
+
+          <!-- Toggle Mapa de Calor de Potencial -->
+          <label class="toggle-item">
+            <div class="toggle-info">
+              <div class="toggle-dot" style="background: #f43f5e;"></div>
+              <div>
+                <div class="toggle-title">Mapeo de Densidad (Heatmap)</div>
+                <div class="toggle-desc">Distribución continua del potencial escalar V(r)</div>
+              </div>
+            </div>
+            <div class="switch">
+              <input type="checkbox" id="toggle-heatmap">
+              <span class="switch-slider"></span>
+            </div>
+          </label>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 3: SONDA SENSOR ESPACIAL -->
+      <section class="sidebar-section">
+        <div class="section-title">
+          <span>3. Sonda Sensor Móvil</span>
+          <span style="font-size: 11px; color: var(--color-sensor);">Arrastra la mira dorada ⌖</span>
+        </div>
+
+        <div class="sensor-card">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-weight: 700; font-size: 12px; color: var(--color-sensor);">LECTURAS EN VIVO</span>
+            <span style="font-size: 10px; color: var(--text-dim); font-family: var(--font-mono);" id="sensor-pos-text">(x, y)</span>
+          </div>
+
+          <div class="sensor-readout-grid">
+            <div class="sensor-box">
+              <div class="label">Potencial Eléctrico (V)</div>
+              <div class="val" id="sensor-v-val">0.00 V</div>
+            </div>
+            <div class="sensor-box">
+              <div class="label">Magnitud |E|</div>
+              <div class="val" id="sensor-e-val">0.00 V/m</div>
+            </div>
+            <div class="sensor-box">
+              <div class="label">Componente Ex</div>
+              <div class="val" id="sensor-ex-val">0.00 V/m</div>
+            </div>
+            <div class="sensor-box">
+              <div class="label">Componente Ey</div>
+              <div class="val" id="sensor-ey-val">0.00 V/m</div>
+            </div>
+          </div>
+
+          <!-- Calculadora de Trabajo W = -q0 * Delta V -->
+          <div class="sensor-work-tool">
+            <div style="font-weight: 600; color: #fbbf24; margin-bottom: 4px;">Medición de Trabajo: W = -q₀ · ΔV</div>
+            <div style="color: var(--text-muted); font-size: 10.5px; line-height: 1.4;">
+              Punto A: <span id="work-va" style="color: #fff; font-family: var(--font-mono);">--</span> | 
+              Punto B: <span id="work-vb" style="color: #fff; font-family: var(--font-mono);">--</span>
+            </div>
+            <div style="margin-top: 4px; font-weight: 700; color: #34d399; font-family: var(--font-mono);" id="work-result">
+              W (q₀ = 1 nC): -- J
+            </div>
+            <div class="work-btns">
+              <button class="btn-small" id="btn-set-point-a">Fijar Punto A</button>
+              <button class="btn-small" id="btn-set-point-b">Fijar Punto B</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 4: DISTRIBUCIONES TÍPICAS (PRESETS) -->
+      <section class="sidebar-section" style="border-bottom: none;">
+        <div class="section-title">
+          <span>4. Configuraciones Predefinidas</span>
+        </div>
+        <div class="presets-grid">
+          <button class="preset-btn" id="preset-dipole">⚡ Dipolo (+ / −)</button>
+          <button class="preset-btn" id="preset-repel">⚡ Cargas Iguales (+ / +)</button>
+          <button class="preset-btn" id="preset-quadrupole">💠 Cuadrupolo</button>
+          <button class="preset-btn" id="preset-capacitor">⚌ Línea de Cargas</button>
+        </div>
+      </section>
+
+    </aside>
+  </div>
+
+  <!-- ==========================================================================
+       DRAWER / PANEL DESPLEGABLE: GUÍA DE EVALUACIÓN Y AUTOEVALUACIÓN
+       ========================================================================== -->
+  <div class="drawer-overlay" id="guide-overlay"></div>
+  <aside class="learning-drawer" id="learning-drawer">
+    <div class="drawer-header">
+      <h2>
+        <span>📖</span>
+        <span>Guía de Evaluación e Interacción</span>
+      </h2>
+      <button class="close-drawer-btn" id="btn-close-guide">✕</button>
+    </div>
+
+    <div class="drawer-content">
+
+      <!-- INTRODUCCIÓN CIENTÍFICA TEÓRICA -->
+      <div style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 12px; padding: 14px; font-size: 13px; line-height: 1.6;">
+        <h3 style="color: #818cf8; font-size: 14px; margin-bottom: 6px; font-weight: 700;">Fundamento Teórico del Modelo</h3>
+        <p style="color: var(--text-muted); margin-bottom: 8px;">
+          En el espacio electrostático generado por $N$ cargas discretas $q_i$, el campo es conservativo y deriva de un potencial escalar:
+        </p>
+        <div class="tex-block" id="math-potential">
+          V(\mathbf{r}) = k_e \sum_{i=1}^{N} \frac{q_i}{|\mathbf{r} - \mathbf{r}_i|}
+        </div>
+        <div class="tex-block" id="math-field">
+          \mathbf{E}(\mathbf{r}) = -\nabla V = k_e \sum_{i=1}^{N} \frac{q_i(\mathbf{r} - \mathbf{r}_i)}{|\mathbf{r} - \mathbf{r}_i|^3}
+        </div>
+      </div>
+
+      <!-- ACTIVIDAD 1: DIPOLO ELÉCTRICO -->
+      <div class="activity-card" id="act-card-1">
+        <span class="activity-badge">Actividad 1</span>
+        <h3 class="activity-title">El Dipolo Eléctrico y Ortogonalidad</h3>
+        <p class="activity-desc">
+          Coloca una carga de $+2\text{ nC}$ y una de $-2\text{ nC}$ separadas horizontalmente. Observa la dirección con la que las líneas de campo cortan las líneas equipotenciales en todos sus puntos de intersección.
+        </p>
+        <button class="activity-load-btn" id="act1-preset-btn">
+          <span>⚡</span> Configurar Escenario Dipolo (+2 nC, -2 nC)
+        </button>
+
+        <div style="font-weight: 600; font-size: 13.5px; margin-bottom: 10px; color: #fff;">
+          Pregunta de Evaluación 1: ¿Qué ángulo forman las líneas de campo eléctrico con respecto a las líneas equipotenciales en cualquier punto del espacio?
+        </div>
+
+        <div class="quiz-options" id="quiz-options-1">
+          <div class="quiz-option" data-opt="a">a) $0^\circ$ (Paralelas entre sí)</div>
+          <div class="quiz-option" data-opt="b">b) $45^\circ$</div>
+          <div class="quiz-option" data-opt="c">c) $90^\circ$ (Perpendiculares)</div>
+          <div class="quiz-option" data-opt="d">d) Varía según la distancia a la carga.</div>
+        </div>
+
+        <div class="feedback-box" id="feedback-1"></div>
+      </div>
+
+      <!-- ACTIVIDAD 2: GEOMETRÍA DEL POTENCIAL CERO -->
+      <div class="activity-card" id="act-card-2">
+        <span class="activity-badge">Actividad 2</span>
+        <h3 class="activity-title">Geometría del Potencial Cero ($V = 0\text{ V}$)</h3>
+        <p class="activity-desc">
+          Manteniendo el dipolo anterior ($+2\text{ nC}$ y $-2\text{ nC}$), ubica la línea equipotencial de $V = 0\text{ V}$ (color verde destacado). Ahora aumenta la carga positiva a $+6\text{ nC}$ con la barra deslizadora.
+        </p>
+        <button class="activity-load-btn" id="act2-preset-btn">
+          <span>⚡</span> Configurar Cargas Asimétricas (+6 nC, -2 nC)
+        </button>
+
+        <div style="font-weight: 600; font-size: 13.5px; margin-bottom: 10px; color: #fff;">
+          Pregunta de Evaluación 2: ¿Qué le sucede a la línea o curva equipotencial de $V = 0\text{ V}$ cuando las magnitudes de las cargas dejan de ser iguales?
+        </div>
+
+        <div class="quiz-options" id="quiz-options-2">
+          <div class="quiz-option" data-opt="a">a) Permanece como una línea recta en el punto medio.</div>
+          <div class="quiz-option" data-opt="b">b) Se curva envolviendo a la carga de menor magnitud absoluta.</div>
+          <div class="quiz-option" data-opt="c">c) Desaparece completamente del plano.</div>
+          <div class="quiz-option" data-opt="d">d) Se convierte en una elipse alrededor de la carga positiva.</div>
+        </div>
+
+        <div class="feedback-box" id="feedback-2"></div>
+      </div>
+
+      <!-- ACTIVIDAD 3: TRABAJO Y MOVIMIENTO DE CARGAS -->
+      <div class="activity-card" id="act-card-3">
+        <span class="activity-badge">Actividad 3</span>
+        <h3 class="activity-title">Trabajo y Movimiento de Cargas</h3>
+        <p class="activity-desc">
+          Utiliza la sonda/sensor para registrar el potencial eléctrico en dos puntos situados sobre la <b>misma</b> línea equipotencial. Usa la calculadora de trabajo integrada en la barra lateral.
+        </p>
+        
+        <div style="font-weight: 600; font-size: 13.5px; margin-bottom: 10px; color: #fff;">
+          Pregunta de Evaluación 3: ¿Cuánto trabajo realiza el campo eléctrico al trasladar una carga de prueba $q_0$ a lo largo de una misma línea equipotencial?
+        </div>
+
+        <div class="quiz-options" id="quiz-options-3">
+          <div class="quiz-option" data-opt="a">a) $W = 0\text{ Joules}$, ya que $\Delta V = V_B - V_A = 0$ y $W = -q_0 \Delta V$.</div>
+          <div class="quiz-option" data-opt="b">b) Depende de la trayectoria seguida entre ambos puntos.</div>
+          <div class="quiz-option" data-opt="c">c) Es siempre positivo y proporcional a la distancia recorrida.</div>
+          <div class="quiz-option" data-opt="d">d) $W = q_0 |\mathbf{E}| d$, independiente de la curvatura.</div>
+        </div>
+
+        <div class="feedback-box" id="feedback-3"></div>
+      </div>
+
+      <!-- BOTÓN DE DESCARGA DEL REPORTE -->
+      <div style="text-align: center; margin-top: 10px;">
+        <button class="topbar-btn green" id="btn-download-report" style="width: 100%; justify-content: center; padding: 12px; font-size: 13px;">
+          📄 Generar y Descargar Reporte de Laboratorio (.txt)
+        </button>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- ==========================================================================
+       MODAL: INSTRUCCIONES DE DESPLIEGUE EN LA NUBE (GITHUB PAGES)
+       ========================================================================== -->
+  <div class="deploy-modal" id="deploy-modal">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+      <h2 style="font-size: 18px; color: #fff; display: flex; align-items: center; gap: 8px;">
+        <span>🚀</span> Despliegue Público en GitHub Pages
+      </h2>
+      <button class="close-drawer-btn" id="btn-close-deploy">✕</button>
+    </div>
+
+    <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 14px;">
+      Este simulador está completamente contenido en un único archivo <code>index.html</code> (HTML5 + CSS3 + JS nativo ES6), sin dependencias complejas de servidor. Puedes publicarlo en la nube en menos de 2 minutos de forma 100% gratuita.
+    </p>
+
+    <div style="display: flex; flex-direction: column; gap: 14px; font-size: 13px;">
+      <div>
+        <b style="color: #38bdf8;">Paso 1: Crear el Repositorio</b>
+        <p style="color: var(--text-muted); margin-top: 4px;">Ingresa a tu cuenta de GitHub y crea un nuevo repositorio público (ej. <code>simulador-campo-electrico</code>).</p>
+      </div>
+
+      <div>
+        <b style="color: #38bdf8;">Paso 2: Subir el Archivo</b>
+        <p style="color: var(--text-muted); margin-top: 4px;">Sube el archivo <code>index.html</code> directamente a la raíz (rama <code>main</code>) del repositorio:</p>
+        <div class="code-block">git init
+git add index.html
+git commit -m "Publicar simulador de campo eléctrico"
+git branch -M main
+git remote add origin https://github.com/iruiz-dotcom/simulador-campo-electrico.git
+git push -u origin main</div>
+      </div>
+
+      <div>
+        <b style="color: #38bdf8;">Paso 3: Activar GitHub Pages</b>
+        <p style="color: var(--text-muted); margin-top: 4px;">En GitHub ve a <b>Settings &gt; Pages</b>. En "Build and deployment", selecciona como fuente la rama <code>main</code> y la carpeta <code>/ (root)</code>. Haz clic en <b>Save</b>.</p>
+      </div>
+
+      <div>
+        <b style="color: #10b981;">Paso 4: URL de Acceso Universal</b>
+        <p style="color: var(--text-muted); margin-top: 4px;">En pocos segundos, GitHub generará tu enlace permanente para compartir con los estudiantes:</p>
+        <div class="code-block" style="color: #10b981;">https://iruiz-dotcom.github.io/simulador-campo-electrico/</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       7. CÓDIGO JAVASCRIPT DE ALTO RENDIMIENTO (FÍSICA + RENDERIZADO CANVAS)
+       ========================================================================== -->
+  <script>
+    /**
+     * SIMULADOR DE CAMPO ELÉCTRICO Y CURVAS EQUIPOTENCIALES
+     * Modelo Físico Exacto & Algoritmos de Renderizado Científico
+     */
+
+    // Constantes físicas
+    const KE = 8.9875517923e9; // Constante de Coulomb (N·m²/C²)
+    const NC_TO_C = 1e-9;      // 1 nC = 10^-9 C
+    const PI2 = Math.PI * 2;
+    const SOFTENING_METERS = 0.015; // Suavizado r_min para evitar singularidades 1/r^2
+
+    // Estado global de la aplicación
+    const state = {
+      // Coordenadas y cámara
+      pixelsPerMeter: 300, // 300 píxeles = 1 metro
+      panX: 0,
+      panY: 0,
+      
+      // Colección de cargas: { id, q (en nC), x (metros), y (metros), radius (px) }
+      charges: [],
+      selectedChargeId: null,
+
+      // Sensor móvil: { x (metros), y (metros), radius (px) }
+      sensor: {
+        x: 0.25,
+        y: 0.0,
+        isDragging: false
+      },
+
+      // Medidor de trabajo (Puntos A y B)
+      workPoints: {
+        va: null,
+        vb: null
+      },
+
+      // Capas de visualización (toggles)
+      layers: {
+        fieldLines: true,
+        equipotentials: true,
+        vectors: false,
+        heatmap: false
+      },
+
+      // Interacción de arrastre
+      draggedItem: null, // { type: 'charge'|'sensor', id, offsetX, offsetY }
+      isPanning: false,
+      panStart: { x: 0, y: 0 },
+
+      // Estado de autoevaluación
+      quizAnswers: {
+        q1: null,
+        q2: null,
+        q3: null
+      }
+    };
+
+    // Elementos DOM principales
+    const canvas = document.getElementById('sim-canvas');
+    const ctx = canvas.getContext('2d');
+    const viewport = document.getElementById('canvas-viewport');
+
+    // UI Elements
+    const statChargeCount = document.getElementById('stat-charge-count');
+    const statNetCharge = document.getElementById('stat-net-charge');
+    const chargeInspector = document.getElementById('charge-inspector');
+    const inspectorBadge = document.getElementById('inspector-badge');
+    const inspectorValText = document.getElementById('inspector-val-text');
+    const inspectorPos = document.getElementById('inspector-pos');
+    const chargeSlider = document.getElementById('charge-slider');
+    const btnDeleteSelected = document.getElementById('btn-delete-selected');
+    const rulerText = document.getElementById('ruler-text');
+
+    // Sensor HUD & Boxes
+    const sensorHud = document.getElementById('sensor-hud');
+    const hudCoord = document.getElementById('hud-coord');
+    const hudV = document.getElementById('hud-v');
+    const hudE = document.getElementById('hud-e');
+    const hudAngle = document.getElementById('hud-angle');
+    const sensorPosText = document.getElementById('sensor-pos-text');
+    const sensorVVal = document.getElementById('sensor-v-val');
+    const sensorEVal = document.getElementById('sensor-e-val');
+    const sensorExVal = document.getElementById('sensor-ex-val');
+    const sensorEyVal = document.getElementById('sensor-ey-val');
+    const workVa = document.getElementById('work-va');
+    const workVb = document.getElementById('work-vb');
+    const workResult = document.getElementById('work-result');
+
+    // ==========================================================================
+    // SISTEMA DE COORDENADAS Y TRANSFORMACIONES
+    // ==========================================================================
+    function resizeCanvas() {
+      const rect = viewport.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+      updateRuler();
+      requestRender();
+    }
+
+    // Conversión de coordenadas de Pantalla a Espacio Físico (Metros)
+    function screenToWorld(sx, sy) {
+      const rect = viewport.getBoundingClientRect();
+      const centerX = rect.width / 2 + state.panX;
+      const centerY = rect.height / 2 + state.panY;
+      const wx = (sx - centerX) / state.pixelsPerMeter;
+      const wy = (sy - centerY) / state.pixelsPerMeter;
+      return { x: wx, y: wy };
+    }
+
+    // Conversión de Espacio Físico (Metros) a Pantalla (Píxeles)
+    function worldToScreen(wx, wy) {
+      const rect = viewport.getBoundingClientRect();
+      const centerX = rect.width / 2 + state.panX;
+      const centerY = rect.height / 2 + state.panY;
+      const sx = centerX + wx * state.pixelsPerMeter;
+      const sy = centerY + wy * state.pixelsPerMeter;
+      return { x: sx, y: sy };
+    }
+
+    function updateRuler() {
+      // 60 píxeles a metros
+      const meters = 60 / state.pixelsPerMeter;
+      rulerText.textContent = meters >= 1 ? `${meters.toFixed(2)} m` : `${(meters * 100).toFixed(0)} cm`;
+    }
+
+    // ==========================================================================
+    // MODELO MATEMÁTICO: CAMPO ELÉCTRICO Y POTENCIAL
+    // ==========================================================================
+
+    /**
+     * Calcula el potencial escalar V en la posición física (x, y) en metros
+     * V(r) = k_e * sum( q_i / sqrt(|r - r_i|^2 + eps^2) )
+     */
+    function computePotential(x, y) {
+      if (state.charges.length === 0) return 0;
+      let V = 0;
+      const factor = KE * NC_TO_C; // ~ 8.98755
+
+      for (let i = 0; i < state.charges.length; i++) {
+        const c = state.charges[i];
+        const dx = x - c.x;
+        const dy = y - c.y;
+        const distSq = dx * dx + dy * dy + (SOFTENING_METERS * SOFTENING_METERS);
+        const dist = Math.sqrt(distSq);
+        V += factor * (c.q / dist);
+      }
+      return V;
+    }
+
+    /**
+     * Calcula el vector campo eléctrico E(x, y) en V/m
+     * E(r) = k_e * sum( q_i * (r - r_i) / (|r - r_i|^2 + eps^2)^(3/2) )
+     */
+    function computeElectricField(x, y) {
+      if (state.charges.length === 0) return { ex: 0, ey: 0, magnitude: 0, angle: 0 };
+      let ex = 0;
+      let ey = 0;
+      const factor = KE * NC_TO_C;
+
+      for (let i = 0; i < state.charges.length; i++) {
+        const c = state.charges[i];
+        const dx = x - c.x;
+        const dy = y - c.y;
+        const distSq = dx * dx + dy * dy + (SOFTENING_METERS * SOFTENING_METERS);
+        const dist = Math.sqrt(distSq);
+        const distCube = dist * distSq;
+        
+        const term = (factor * c.q) / distCube;
+        ex += term * dx;
+        ey += term * dy;
+      }
+
+      const magnitude = Math.sqrt(ex * ex + ey * ey);
+      const angle = Math.atan2(ey, ex);
+      return { ex, ey, magnitude, angle };
+    }
+
+    // ==========================================================================
+    // RENDERIZADO: LÍNEAS DE CAMPO ELÉCTRICO (INTEGRACIÓN RUNGE-KUTTA 2DO ORDEN)
+    // ==========================================================================
+    function drawFieldLines() {
+      if (!state.layers.fieldLines || state.charges.length === 0) return;
+
+      const rect = viewport.getBoundingClientRect();
+      const margin = 50;
+      const bounds = {
+        minX: -margin,
+        maxX: rect.width + margin,
+        minY: -margin,
+        maxY: rect.height + margin
+      };
+
+      const startOffsetDist = 0.05; // 5 cm de distancia inicial desde la carga
+      const stepMeters = 5 / state.pixelsPerMeter; // paso numérico en metros (~5 px)
+      const maxSteps = 450;
+      const chargeRadiusCapture = 0.04; // radio de absorción por carga negativa
+
+      ctx.save();
+      ctx.lineWidth = 1.6;
+
+      // Determinamos puntos semilla (semillas angulares desde cargas)
+      const seeds = [];
+      const hasPositive = state.charges.some(c => c.q > 0);
+
+      state.charges.forEach(c => {
+        if (c.q === 0) return;
+        // Número de líneas proporcional a la magnitud de la carga
+        const lineCount = Math.min(36, Math.max(8, Math.round(Math.abs(c.q) * 4)));
+        const isPos = c.q > 0;
+
+        // Si hay positivas, trazamos hacia afuera desde las positivas
+        // Si solo hay negativas, trazamos hacia adentro en sentido inverso
+        if (isPos || !hasPositive) {
+          const dirSign = isPos ? 1 : -1;
+          for (let i = 0; i < lineCount; i++) {
+            const angle = (PI2 * i) / lineCount;
+            const sx = c.x + Math.cos(angle) * startOffsetDist;
+            const sy = c.y + Math.sin(angle) * startOffsetDist;
+            seeds.push({ x: sx, y: sy, dirSign });
+          }
+        }
+      });
+
+      // Trazamos cada línea de campo con RK2 (Heun/Midpoint)
+      seeds.forEach(seed => {
+        let curX = seed.x;
+        let curY = seed.y;
+        const dir = seed.dirSign;
+        const points = [{ x: curX, y: curY }];
+
+        for (let step = 0; step < maxSteps; step++) {
+          const field1 = computeElectricField(curX, curY);
+          if (field1.magnitude < 1e-4) break;
+
+          // Vector normalizado k1
+          const u1x = (field1.ex / field1.magnitude) * dir;
+          const u1y = (field1.ey / field1.magnitude) * dir;
+
+          // Punto intermedio para RK2
+          const midX = curX + u1x * (stepMeters * 0.5);
+          const midY = curY + u1y * (stepMeters * 0.5);
+          const field2 = computeElectricField(midX, midY);
+          if (field2.magnitude < 1e-4) break;
+
+          const u2x = (field2.ex / field2.magnitude) * dir;
+          const u2y = (field2.ey / field2.magnitude) * dir;
+
+          // Avance final
+          curX += u2x * stepMeters;
+          curY += u2y * stepMeters;
+
+          points.push({ x: curX, y: curY });
+
+          // Verificación de límites de pantalla
+          const sPos = worldToScreen(curX, curY);
+          if (sPos.x < bounds.minX || sPos.x > bounds.maxX || sPos.y < bounds.minY || sPos.y > bounds.maxY) {
+            break;
+          }
+
+          // Verificación de captura en una carga de signo opuesto
+          let captured = false;
+          for (let ci = 0; ci < state.charges.length; ci++) {
+            const oc = state.charges[ci];
+            if ((dir > 0 && oc.q < 0) || (dir < 0 && oc.q > 0)) {
+              const ddx = curX - oc.x;
+              const ddy = curY - oc.y;
+              if (ddx * ddx + ddy * ddy < chargeRadiusCapture * chargeRadiusCapture) {
+                captured = true;
+                break;
+              }
+            }
+          }
+          if (captured) break;
+        }
+
+        if (points.length < 2) return;
+
+        // Renderizado del trazo con gradiente sutil
+        ctx.beginPath();
+        const startScreen = worldToScreen(points[0].x, points[0].y);
+        ctx.moveTo(startScreen.x, startScreen.y);
+
+        for (let i = 1; i < points.length; i++) {
+          const pScreen = worldToScreen(points[i].x, points[i].y);
+          ctx.lineTo(pScreen.x, pScreen.y);
+        }
+
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+        ctx.shadowColor = 'rgba(56, 189, 248, 0.3)';
+        ctx.shadowBlur = 4;
+        ctx.stroke();
+
+        // Flechas indicadoras direccionales a lo largo de la línea
+        const arrowInterval = 28; // cada 28 pasos de integración
+        for (let i = arrowInterval; i < points.length - 10; i += arrowInterval) {
+          const p1 = worldToScreen(points[i].x, points[i].y);
+          const p2 = worldToScreen(points[i + 1].x, points[i + 1].y);
+          const arrowAngle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+          drawFieldArrow(p1.x, p1.y, arrowAngle);
+        }
+      });
+
+      ctx.restore();
+    }
+
+    // Dibuja una cabeza de flecha elegante
+    function drawFieldArrow(x, y, angle) {
+      const size = 6.5;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.moveTo(size, 0);
+      ctx.lineTo(-size, -size * 0.6);
+      ctx.lineTo(-size * 0.4, 0);
+      ctx.lineTo(-size, size * 0.6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // ==========================================================================
+    // RENDERIZADO: CURVAS EQUIPOTENCIALES (MARCHING SQUARES)
+    // ==========================================================================
+    function drawEquipotentials() {
+      if (!state.layers.equipotentials || state.charges.length === 0) return;
+
+      const rect = viewport.getBoundingClientRect();
+      const cellSize = 10; // píxeles por celda en la rejilla de contorno
+      const cols = Math.ceil(rect.width / cellSize);
+      const rows = Math.ceil(rect.height / cellSize);
+
+      // Precalcular el potencial en los nodos de la rejilla
+      const grid = new Float32Array((cols + 1) * (rows + 1));
+      for (let j = 0; j <= rows; j++) {
+        const sy = j * cellSize;
+        for (let i = 0; i <= cols; i++) {
+          const sx = i * cellSize;
+          const w = screenToWorld(sx, sy);
+          grid[j * (cols + 1) + i] = computePotential(w.x, w.y);
+        }
+      }
+
+      // Conjunto estándar de isovalores de potencial (V)
+      // Con valores distribuidos geométricamente y el crítico V = 0
+      const isovalues = [
+        -1200, -600, -350, -200, -120, -70, -40, -20, -10, -5,
+        0,
+        5, 10, 20, 40, 70, 120, 200, 350, 600, 1200
+      ];
+
+      ctx.save();
+
+      // Procesar cada isovalor con Marching Squares
+      isovalues.forEach(isoval => {
+        ctx.beginPath();
+
+        let isZero = Math.abs(isoval) < 0.001;
+        let strokeColor;
+        let lineWidth = 1.3;
+
+        if (isZero) {
+          strokeColor = '#10b981'; // Verde esmeralda brillante para V = 0
+          lineWidth = 2.2;
+          ctx.setLineDash([6, 4]); // Destacado con línea punteada
+        } else if (isoval > 0) {
+          // Tonos cálidos (rojo/naranja) para V > 0
+          const intensity = Math.min(1, Math.max(0.35, Math.abs(isoval) / 400));
+          strokeColor = `rgba(255, 107, 107, ${intensity})`;
+          ctx.setLineDash([]);
+        } else {
+          // Tonos fríos (cian/azul) para V < 0
+          const intensity = Math.min(1, Math.max(0.35, Math.abs(isoval) / 400));
+          strokeColor = `rgba(0, 210, 211, ${intensity})`;
+          ctx.setLineDash([]);
+        }
+
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = lineWidth;
+
+        // Escaneo de las celdas
+        for (let j = 0; j < rows; j++) {
+          const y0 = j * cellSize;
+          const y1 = y0 + cellSize;
+
+          for (let i = 0; i < cols; i++) {
+            const x0 = i * cellSize;
+            const x1 = x0 + cellSize;
+
+            // Valores en las cuatro esquinas: Top-Left, Top-Right, Bottom-Right, Bottom-Left
+            const vTL = grid[j * (cols + 1) + i];
+            const vTR = grid[j * (cols + 1) + (i + 1)];
+            const vBR = grid[(j + 1) * (cols + 1) + (i + 1)];
+            const vBL = grid[(j + 1) * (cols + 1) + i];
+
+            // Índice binario (TL, TR, BR, BL)
+            let cellIndex = 0;
+            if (vTL > isoval) cellIndex |= 8;
+            if (vTR > isoval) cellIndex |= 4;
+            if (vBR > isoval) cellIndex |= 2;
+            if (vBL > isoval) cellIndex |= 1;
+
+            if (cellIndex === 0 || cellIndex === 15) continue; // Completamente adentro o afuera
+
+            // Interpolación lineal de bordes
+            // Borde Superior (Top: TL -> TR)
+            const topT = (isoval - vTL) / (vTR - vTL || 1e-9);
+            const edgeTop = { x: x0 + topT * cellSize, y: y0 };
+
+            // Borde Derecho (Right: TR -> BR)
+            const rightT = (isoval - vTR) / (vBR - vTR || 1e-9);
+            const edgeRight = { x: x1, y: y0 + rightT * cellSize };
+
+            // Borde Inferior (Bottom: BL -> BR)
+            const bottomT = (isoval - vBL) / (vBR - vBL || 1e-9);
+            const edgeBottom = { x: x0 + bottomT * cellSize, y: y1 };
+
+            // Borde Izquierdo (Left: TL -> BL)
+            const leftT = (isoval - vTL) / (vBL - vTL || 1e-9);
+            const edgeLeft = { x: x0, y: y0 + leftT * cellSize };
+
+            // Trazado de segmentos según los 16 casos de Marching Squares
+            switch (cellIndex) {
+              case 1:  case 14: drawSegment(edgeLeft, edgeBottom); break;
+              case 2:  case 13: drawSegment(edgeBottom, edgeRight); break;
+              case 3:  case 12: drawSegment(edgeLeft, edgeRight); break;
+              case 4:  case 11: drawSegment(edgeTop, edgeRight); break;
+              case 5:
+                drawSegment(edgeLeft, edgeTop);
+                drawSegment(edgeBottom, edgeRight);
+                break;
+              case 6:  case 9:  drawSegment(edgeTop, edgeBottom); break;
+              case 7:  case 8:  drawSegment(edgeLeft, edgeTop); break;
+              case 10:
+                drawSegment(edgeLeft, edgeBottom);
+                drawSegment(edgeTop, edgeRight);
+                break;
+            }
+          }
+        }
+        ctx.stroke();
+      });
+
+      ctx.restore();
+    }
+
+    function drawSegment(p1, p2) {
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+    }
+
+    // ==========================================================================
+    // RENDERIZADO: REJILLA DE VECTORES DE CAMPO ELÉCTRICO
+    // ==========================================================================
+    function drawVectorGrid() {
+      if (!state.layers.vectors || state.charges.length === 0) return;
+
+      const rect = viewport.getBoundingClientRect();
+      const step = 38; // espaciado en píxeles
+      const arrowLength = 15;
+
+      ctx.save();
+      for (let sy = step / 2; sy < rect.height; sy += step) {
+        for (let sx = step / 2; sx < rect.width; sx += step) {
+          const w = screenToWorld(sx, sy);
+          const f = computeElectricField(w.x, w.y);
+          if (f.magnitude < 1e-3) continue;
+
+          // Normalizar y escalar por logaritmo para evitar desbordes visuales
+          const ux = f.ex / f.magnitude;
+          const uy = f.ey / f.magnitude;
+          const len = Math.min(arrowLength, 5 + Math.log10(1 + f.magnitude) * 3);
+          const opacity = Math.min(0.9, Math.max(0.15, Math.log10(1 + f.magnitude) * 0.25));
+
+          const endX = sx + ux * len;
+          const endY = sy + uy * len;
+
+          ctx.strokeStyle = `rgba(168, 85, 247, ${opacity})`;
+          ctx.fillStyle = `rgba(168, 85, 247, ${opacity})`;
+          ctx.lineWidth = 1.3;
+
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+
+          // Cabeza minúscula
+          const angle = Math.atan2(uy, ux);
+          ctx.save();
+          ctx.translate(endX, endY);
+          ctx.rotate(angle);
+          ctx.beginPath();
+          ctx.moveTo(4, 0);
+          ctx.lineTo(-3, -2.5);
+          ctx.lineTo(-3, 2.5);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+      ctx.restore();
+    }
+
+    // ==========================================================================
+    // RENDERIZADO: MAPA DE CALOR (HEATMAP DE POTENCIAL)
+    // ==========================================================================
+    function drawHeatmap() {
+      if (!state.layers.heatmap || state.charges.length === 0) return;
+
+      const rect = viewport.getBoundingClientRect();
+      const cellSize = 18; // granularidad para 60fps
+      const cols = Math.ceil(rect.width / cellSize);
+      const rows = Math.ceil(rect.height / cellSize);
+
+      ctx.save();
+      for (let j = 0; j < rows; j++) {
+        const sy = j * cellSize;
+        for (let i = 0; i < cols; i++) {
+          const sx = i * cellSize;
+          const w = screenToWorld(sx + cellSize / 2, sy + cellSize / 2);
+          const v = computePotential(w.x, w.y);
+
+          // Mapeo no lineal mediante tangente hiperbólica tanh
+          const norm = Math.tanh(v / 150); // [-1, 1]
+          let r, g, b, a;
+
+          if (norm > 0) {
+            // Potencial Positivo: Rojo/Ámbar
+            r = Math.floor(255 * norm);
+            g = Math.floor(60 * (1 - norm));
+            b = 40;
+            a = Math.min(0.4, norm * 0.45);
+          } else {
+            // Potencial Negativo: Azul/Cian
+            const absN = Math.abs(norm);
+            r = 20;
+            g = Math.floor(180 * absN);
+            b = Math.floor(255 * absN);
+            a = Math.min(0.4, absN * 0.45);
+          }
+
+          ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+          ctx.fillRect(sx, sy, cellSize, cellSize);
+        }
+      }
+      ctx.restore();
+    }
+
+    // ==========================================================================
+    // RENDERIZADO: CARGAS DISCRETAS Y SONDA SENSOR
+    // ==========================================================================
+    function drawCharges() {
+      state.charges.forEach(c => {
+        const s = worldToScreen(c.x, c.y);
+        const radius = 18;
+        const isSelected = c.id === state.selectedChargeId;
+        const isPos = c.q > 0;
+        const color = isPos ? '#ff4757' : (c.q < 0 ? '#00d2d3' : '#94a3b8');
+        const glowColor = isPos ? 'rgba(255, 71, 87, 0.5)' : 'rgba(0, 210, 211, 0.5)';
+
+        ctx.save();
+
+        // Anillo de selección si está activa
+        if (isSelected) {
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, radius + 6, 0, PI2);
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 4]);
+          ctx.stroke();
+        }
+
+        // Resplandor exterior (Glow)
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, radius + 4, 0, PI2);
+        ctx.fillStyle = glowColor;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 16;
+        ctx.fill();
+
+        // Cuerpo principal de la carga con gradiente esférico 3D
+        const grad = ctx.createRadialGradient(
+          s.x - radius * 0.3, s.y - radius * 0.3, radius * 0.1,
+          s.x, s.y, radius
+        );
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.35, color);
+        grad.addColorStop(1, isPos ? '#8b0000' : '#006266');
+
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, radius, 0, PI2);
+        ctx.fillStyle = grad;
+        ctx.shadowBlur = 0;
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Símbolo (+ o -) y valor en nC
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 15px Outfit, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(isPos ? '+' : (c.q < 0 ? '−' : '0'), s.x, s.y - 1);
+
+        // Etiqueta flotante de magnitud de carga
+        ctx.font = '600 11px JetBrains Mono, monospace';
+        ctx.fillStyle = '#f8fafc';
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 4;
+        ctx.fillText(`${c.q > 0 ? '+' : ''}${c.q} nC`, s.x, s.y + radius + 14);
+
+        ctx.restore();
+      });
+    }
+
+    function drawSensor() {
+      const s = worldToScreen(state.sensor.x, state.sensor.y);
+      const radius = 12;
+
+      ctx.save();
+
+      // Halo dorado resplandeciente
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, radius + 8, 0, PI2);
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
+      ctx.shadowColor = '#f59e0b';
+      ctx.shadowBlur = 12;
+      ctx.fill();
+
+      // Mira de precisión (Crosshair)
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, radius, 0, PI2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(s.x - radius - 5, s.y);
+      ctx.lineTo(s.x + radius + 5, s.y);
+      ctx.moveTo(s.x, s.y - radius - 5);
+      ctx.lineTo(s.x, s.y + radius + 5);
+      ctx.stroke();
+
+      // Punto central
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 3, 0, PI2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+
+      // Vector de campo resultante en el sensor
+      const f = computeElectricField(state.sensor.x, state.sensor.y);
+      if (f.magnitude > 1e-2) {
+        const arrowLen = Math.min(60, 20 + Math.log10(1 + f.magnitude) * 8);
+        const ux = f.ex / f.magnitude;
+        const uy = f.ey / f.magnitude;
+        const endX = s.x + ux * arrowLen;
+        const endY = s.y + uy * arrowLen;
+
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(s.x, s.y);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+
+        drawFieldArrow(endX, endY, Math.atan2(uy, ux));
+      }
+
+      ctx.restore();
+    }
+
+    // ==========================================================================
+    // BUCLE PRINCIPAL DE DIBUJO (RENDER LOOP)
+    // ==========================================================================
+    let renderRequested = false;
+    function requestRender() {
+      if (!renderRequested) {
+        renderRequested = true;
+        requestAnimationFrame(render);
+      }
+    }
+
+    function render() {
+      renderRequested = false;
+      const rect = viewport.getBoundingClientRect();
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      // Rejilla de fondo tenue
+      drawBackgroundGrid(rect);
+
+      // Capas en orden de profundidad
+      drawHeatmap();
+      drawEquipotentials();
+      drawVectorGrid();
+      drawFieldLines();
+      drawCharges();
+      drawSensor();
+
+      updateSensorReadouts();
+    }
+
+    function drawBackgroundGrid(rect) {
+      ctx.save();
+      const gridPx = 30;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.025)';
+      ctx.lineWidth = 1;
+
+      const offsetX = (rect.width / 2 + state.panX) % gridPx;
+      const offsetY = (rect.height / 2 + state.panY) % gridPx;
+
+      ctx.beginPath();
+      for (let x = offsetX; x < rect.width; x += gridPx) {
+        ctx.moveTo(x, 0); ctx.lineTo(x, rect.height);
+      }
+      for (let y = offsetY; y < rect.height; y += gridPx) {
+        ctx.moveTo(0, y); ctx.lineTo(rect.width, y);
+      }
+      ctx.stroke();
+
+      // Ejes centrales sutiles
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+      ctx.beginPath();
+      ctx.moveTo(rect.width / 2 + state.panX, 0);
+      ctx.lineTo(rect.width / 2 + state.panX, rect.height);
+      ctx.moveTo(0, rect.height / 2 + state.panY);
+      ctx.lineTo(rect.width, rect.height / 2 + state.panY);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // ==========================================================================
+    // ACTUALIZACIÓN DEL SENSOR Y LECTURAS CIENTÍFICAS
+    // ==========================================================================
+    function updateSensorReadouts() {
+      const v = computePotential(state.sensor.x, state.sensor.y);
+      const f = computeElectricField(state.sensor.x, state.sensor.y);
+      const angleDeg = (f.angle * 180 / Math.PI + 360) % 360;
+
+      // Actualizar tarjeta del sensor en el sidebar
+      sensorPosText.textContent = `(${state.sensor.x.toFixed(2)}, ${state.sensor.y.toFixed(2)}) m`;
+      sensorVVal.textContent = `${v.toFixed(2)} V`;
+      sensorEVal.textContent = `${f.magnitude.toFixed(2)} V/m`;
+      sensorExVal.textContent = `${f.ex.toFixed(2)} V/m`;
+      sensorEyVal.textContent = `${f.ey.toFixed(2)} V/m`;
+
+      // Actualizar HUD flotante
+      const s = worldToScreen(state.sensor.x, state.sensor.y);
+      sensorHud.style.left = `${s.x}px`;
+      sensorHud.style.top = `${s.y}px`;
+      hudCoord.textContent = `(${state.sensor.x.toFixed(2)}, ${state.sensor.y.toFixed(2)}) m`;
+      hudV.textContent = `${v.toFixed(2)} V`;
+      hudE.textContent = `${f.magnitude.toFixed(2)} V/m`;
+      hudAngle.textContent = `${angleDeg.toFixed(1)}°`;
+
+      // Posición de la carga seleccionada en el inspector
+      const sel = getSelectedCharge();
+      if (sel) {
+        inspectorPos.textContent = `(${sel.x.toFixed(2)}, ${sel.y.toFixed(2)}) m`;
+      }
+    }
+
+    function getSelectedCharge() {
+      return state.charges.find(c => c.id === state.selectedChargeId);
+    }
+
+    function updateStats() {
+      statChargeCount.textContent = state.charges.length;
+      const net = state.charges.reduce((acc, c) => acc + c.q, 0);
+      statNetCharge.textContent = `${net > 0 ? '+' : ''}${net} nC`;
+    }
+
+    // ==========================================================================
+    // GESTIÓN DE CARGAS: AGREGAR, MODIFICAR, ELIMINAR
+    // ==========================================================================
+    let chargeCounter = 1;
+    function addCharge(q, wx = null, wy = null) {
+      if (wx === null || wy === null) {
+        // Generar en un radio razonable alrededor del centro
+        const spread = (state.charges.length % 5) * 0.08;
+        wx = (Math.random() - 0.5) * 0.4 + spread;
+        wy = (Math.random() - 0.5) * 0.4;
+      }
+
+      const newCharge = {
+        id: `charge_${chargeCounter++}`,
+        q: q,
+        x: wx,
+        y: wy
+      };
+
+      state.charges.push(newCharge);
+      selectCharge(newCharge.id);
+      updateStats();
+      requestRender();
+      return newCharge;
+    }
+
+    function selectCharge(id) {
+      state.selectedChargeId = id;
+      const c = getSelectedCharge();
+      if (c) {
+        chargeInspector.classList.add('active');
+        chargeSlider.value = c.q;
+        inspectorValText.textContent = `${c.q > 0 ? '+' : ''}${c.q} nC`;
+        inspectorPos.textContent = `(${c.x.toFixed(2)}, ${c.y.toFixed(2)}) m`;
+
+        if (c.q >= 0) {
+          inspectorBadge.className = 'charge-badge positive';
+          inspectorBadge.textContent = `+${c.q} nC`;
+        } else {
+          inspectorBadge.className = 'charge-badge negative';
+          inspectorBadge.textContent = `${c.q} nC`;
+        }
+      } else {
+        chargeInspector.classList.remove('active');
+      }
+      requestRender();
+    }
+
+    function deleteSelectedCharge() {
+      if (!state.selectedChargeId) return;
+      state.charges = state.charges.filter(c => c.id !== state.selectedChargeId);
+      state.selectedChargeId = null;
+      selectCharge(null);
+      updateStats();
+      requestRender();
+    }
+
+    // ==========================================================================
+    // EVENTOS DE RATÓN Y TOQUE MULTITÁCTIL (POINTER EVENTS UNIFICADOS)
+    // ==========================================================================
+    function setupPointerInteractions() {
+      let isPointerDown = false;
+      let startScreen = { x: 0, y: 0 };
+
+      viewport.addEventListener('pointerdown', (e) => {
+        const rect = viewport.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+        isPointerDown = true;
+        startScreen = { x: sx, y: sy };
+
+        viewport.setPointerCapture(e.pointerId);
+
+        // 1. Probar si se hizo clic en el Sensor Espacial
+        const sensorScreen = worldToScreen(state.sensor.x, state.sensor.y);
+        const distSensor = Math.hypot(sx - sensorScreen.x, sy - sensorScreen.y);
+        if (distSensor < 26) {
+          state.draggedItem = { type: 'sensor' };
+          sensorHud.style.display = 'block';
+          return;
+        }
+
+        // 2. Probar si se hizo clic en alguna carga
+        let clickedCharge = null;
+        for (let i = state.charges.length - 1; i >= 0; i--) {
+          const c = state.charges[i];
+          const cs = worldToScreen(c.x, c.y);
+          if (Math.hypot(sx - cs.x, sy - cs.y) < 24) {
+            clickedCharge = c;
+            break;
+          }
+        }
+
+        if (clickedCharge) {
+          selectCharge(clickedCharge.id);
+          state.draggedItem = {
+            type: 'charge',
+            id: clickedCharge.id,
+            startWx: clickedCharge.x,
+            startWy: clickedCharge.y,
+            startPointerW: screenToWorld(sx, sy)
+          };
+          return;
+        }
+
+        // 3. Si se hace clic en el fondo vacío, iniciar Paneado de Cámara
+        state.isPanning = true;
+        state.panStart = { x: sx - state.panX, y: sy - state.panY };
+        selectCharge(null);
+      });
+
+      viewport.addEventListener('pointermove', (e) => {
+        const rect = viewport.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+
+        if (state.draggedItem) {
+          if (state.draggedItem.type === 'sensor') {
+            const w = screenToWorld(sx, sy);
+            state.sensor.x = w.x;
+            state.sensor.y = w.y;
+            requestRender();
+          } else if (state.draggedItem.type === 'charge') {
+            const c = getSelectedCharge();
+            if (c) {
+              const currentW = screenToWorld(sx, sy);
+              const dx = currentW.x - state.draggedItem.startPointerW.x;
+              const dy = currentW.y - state.draggedItem.startPointerW.y;
+              c.x = state.draggedItem.startWx + dx;
+              c.y = state.draggedItem.startWy + dy;
+              requestRender();
+            }
+          }
+        } else if (state.isPanning) {
+          state.panX = sx - state.panStart.x;
+          state.panY = sy - state.panStart.y;
+          requestRender();
+        }
+      });
+
+      viewport.addEventListener('pointerup', (e) => {
+        isPointerDown = false;
+        state.draggedItem = null;
+        state.isPanning = false;
+        try { viewport.releasePointerCapture(e.pointerId); } catch(err) {}
+        requestRender();
+      });
+
+      viewport.addEventListener('pointercancel', () => {
+        state.draggedItem = null;
+        state.isPanning = false;
+      });
+
+      // Zoom con rueda de ratón centrado en el puntero
+      viewport.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
+        applyZoom(zoomFactor, e.clientX, e.clientY);
+      }, { passive: false });
+    }
+
+    function applyZoom(factor, clientX = null, clientY = null) {
+      const rect = viewport.getBoundingClientRect();
+      const sx = clientX !== null ? clientX - rect.left : rect.width / 2;
+      const sy = clientY !== null ? clientY - rect.top : rect.height / 2;
+
+      const wBefore = screenToWorld(sx, sy);
+      state.pixelsPerMeter = Math.max(80, Math.min(1200, state.pixelsPerMeter * factor));
+      const wAfter = screenToWorld(sx, sy);
+
+      // Ajustar paneo para mantener el punto bajo el cursor fijo
+      state.panX += (wAfter.x - wBefore.x) * state.pixelsPerMeter;
+      state.panY += (wAfter.y - wBefore.y) * state.pixelsPerMeter;
+
+      updateRuler();
+      requestRender();
+    }
+
+    // ==========================================================================
+    // PRESETS DIDÁCTICOS DE LA SIMULACIÓN
+    // ==========================================================================
+    function setupPresets() {
+      // Dipolo eléctrico clásico (+2 nC, -2 nC)
+      document.getElementById('preset-dipole').addEventListener('click', () => {
+        state.charges = [];
+        state.panX = 0;
+        state.panY = 0;
+        addCharge(2, -0.22, 0);
+        addCharge(-2, 0.22, 0);
+        state.sensor.x = 0;
+        state.sensor.y = 0.25;
+        requestRender();
+      });
+
+      // Repulsión de dos cargas iguales (+2 nC, +2 nC)
+      document.getElementById('preset-repel').addEventListener('click', () => {
+        state.charges = [];
+        state.panX = 0;
+        state.panY = 0;
+        addCharge(2, -0.22, 0);
+        addCharge(2, 0.22, 0);
+        state.sensor.x = 0;
+        state.sensor.y = 0;
+        requestRender();
+      });
+
+      // Cuadrupolo en cuadrado
+      document.getElementById('preset-quadrupole').addEventListener('click', () => {
+        state.charges = [];
+        state.panX = 0;
+        state.panY = 0;
+        const d = 0.20;
+        addCharge(2, -d, -d);
+        addCharge(-2, d, -d);
+        addCharge(-2, -d, d);
+        addCharge(2, d, d);
+        state.sensor.x = 0;
+        state.sensor.y = 0;
+        requestRender();
+      });
+
+      // Línea de cargas (modelo de placas paralelas)
+      document.getElementById('preset-capacitor').addEventListener('click', () => {
+        state.charges = [];
+        state.panX = 0;
+        state.panY = 0;
+        const yTop = -0.16;
+        const yBottom = 0.16;
+        for (let i = -2; i <= 2; i++) {
+          addCharge(1, i * 0.12, yTop);
+          addCharge(-1, i * 0.12, yBottom);
+        }
+        state.sensor.x = 0;
+        state.sensor.y = 0;
+        requestRender();
+      });
+    }
+
+    // ==========================================================================
+    // HERRAMIENTA DE CÁLCULO DE TRABAJO (SONDA ESPACIAL)
+    // ==========================================================================
+    function setupWorkTool() {
+      const btnSetA = document.getElementById('btn-set-point-a');
+      const btnSetB = document.getElementById('btn-set-point-b');
+
+      btnSetA.addEventListener('click', () => {
+        const v = computePotential(state.sensor.x, state.sensor.y);
+        state.workPoints.va = v;
+        workVa.textContent = `${v.toFixed(2)} V`;
+        calculateWork();
+      });
+
+      btnSetB.addEventListener('click', () => {
+        const v = computePotential(state.sensor.x, state.sensor.y);
+        state.workPoints.vb = v;
+        workVb.textContent = `${v.toFixed(2)} V`;
+        calculateWork();
+      });
+
+      function calculateWork() {
+        if (state.workPoints.va !== null && state.workPoints.vb !== null) {
+          const deltaV = state.workPoints.vb - state.workPoints.va;
+          const q0 = 1e-9; // 1 nC de carga de prueba
+          const W = -q0 * deltaV; // W = -q0 * Delta V en Joules
+          workResult.textContent = `W: ${W.toExponential(3)} J (ΔV = ${deltaV.toFixed(2)} V)`;
+        }
+      }
+    }
+
+    // ==========================================================================
+    // GUÍA DE EVALUACIÓN Y VALIDACIÓN INTERACTIVA
+    // ==========================================================================
+    function setupQuizActivities() {
+      // Actividad 1: Preset Dipolo
+      document.getElementById('act1-preset-btn').addEventListener('click', () => {
+        state.charges = [];
+        state.panX = 0; state.panY = 0;
+        addCharge(2, -0.22, 0);
+        addCharge(-2, 0.22, 0);
+        state.layers.fieldLines = true;
+        state.layers.equipotentials = true;
+        document.getElementById('toggle-fieldlines').checked = true;
+        document.getElementById('toggle-equipotentials').checked = true;
+        requestRender();
+      });
+
+      // Actividad 2: Preset Asimétrico (+6 nC, -2 nC)
+      document.getElementById('act2-preset-btn').addEventListener('click', () => {
+        state.charges = [];
+        state.panX = 0; state.panY = 0;
+        addCharge(6, -0.25, 0);
+        addCharge(-2, 0.22, 0);
+        state.layers.equipotentials = true;
+        document.getElementById('toggle-equipotentials').checked = true;
+        requestRender();
+      });
+
+      // Lógica de validación de preguntas
+      setupQuestion('quiz-options-1', 'feedback-1', 'c', {
+        correct: '¡Correcto! Las líneas de campo eléctrico son ortogonales (perpendiculares a 90°) a las líneas equipotenciales en todo punto, debido a que el campo es el gradiente negativo del potencial escalar (E = -∇V). Moverse a lo largo de una equipotencial implica dV = 0, luego E · dr = 0.',
+        incorrect: 'Incorrecto. Recuerda la definición matemática: E = -∇V. La dirección del gradiente es siempre perpendicular a las curvas de nivel (equipotenciales).'
+      }, 'act-card-1', 'q1');
+
+      setupQuestion('quiz-options-2', 'feedback-2', 'b', {
+        correct: '¡Excelente deducción! Cuando las cargas tienen magnitudes distintas (|q₁| ≠ |q₂|), la curva de potencial nulo V = 0 deja de ser un plano/línea recta mediadora y se transforma geométricamente en un círculo de Apolonio que envuelve a la carga de menor magnitud absoluta.',
+        incorrect: 'No exactamente. Recuerda que la condición V = 0 exige k·q₁/r₁ + k·q₂/r₂ = 0, lo que impone la razón de distancias r₁/r₂ = |q₁/q₂| = constante. El lugar geométrico de puntos cuya razón de distancias a dos focos es constante es una circunferencia de Apolonio que encierra la carga menor.'
+      }, 'act-card-2', 'q2');
+
+      setupQuestion('quiz-options-3', 'feedback-3', 'a', {
+        correct: '¡Exacto! Como los dos puntos pertenecen a la misma línea equipotencial, V_A = V_B, por ende ΔV = 0. De la definición de trabajo electrostático W = -q₀ ΔV = 0 Joules. Además, la fuerza eléctrica es perpendicular al desplazamiento en cada instante.',
+        incorrect: 'Incorrecto. Como la fuerza electrostática es conservativa, el trabajo solo depende del potencial inicial y final: W = -q₀(V_B - V_A). Si ambos puntos están sobre la misma línea equipotencial, ΔV = 0.'
+      }, 'act-card-3', 'q3');
+    }
+
+    function setupQuestion(optionsId, feedbackId, correctOpt, texts, cardId, stateKey) {
+      const container = document.getElementById(optionsId);
+      const feedback = document.getElementById(feedbackId);
+      const card = document.getElementById(cardId);
+      const options = container.querySelectorAll('.quiz-option');
+
+      options.forEach(opt => {
+        opt.addEventListener('click', () => {
+          const val = opt.getAttribute('data-opt');
+          state.quizAnswers[stateKey] = val;
+
+          options.forEach(o => {
+            o.classList.remove('selected', 'correct', 'incorrect');
+          });
+
+          if (val === correctOpt) {
+            opt.classList.add('correct');
+            feedback.className = 'feedback-box show success';
+            feedback.textContent = texts.correct;
+            card.classList.add('completed');
+          } else {
+            opt.classList.add('incorrect');
+            feedback.className = 'feedback-box show error';
+            feedback.textContent = texts.incorrect;
+            card.classList.remove('completed');
+          }
+        });
+      });
+    }
+
+    // ==========================================================================
+    // EXPORTACIÓN DE REPORTE Y CAPTURA DE PANTALLA
+    // ==========================================================================
+    function setupExportTools() {
+      // Descargar reporte de laboratorio en texto
+      document.getElementById('btn-download-report').addEventListener('click', () => {
+        const date = new Date().toLocaleString();
+        let report = `==========================================================\n`;
+        report += `REPORTE DE LABORATORIO: CAMPO ELÉCTRICO Y EQUIPOTENCIALES\n`;
+        report += `Fecha de realización: ${date}\n`;
+        report += `Software: Simulador Físico Universitario (Canvas 2D ES6)\n`;
+        report += `==========================================================\n\n`;
+
+        report += `1. CONFIGURACIÓN DEL SISTEMA:\n`;
+        report += `   - Número de cargas en lienzo: ${state.charges.length}\n`;
+        report += `   - Carga neta total: ${state.charges.reduce((a,c)=>a+c.q,0)} nC\n`;
+        state.charges.forEach((c, idx) => {
+          report += `     Carga #${idx+1}: q = ${c.q} nC en (${c.x.toFixed(3)}, ${c.y.toFixed(3)}) m\n`;
+        });
+        report += `   - Lectura de sonda actual:\n`;
+        const v = computePotential(state.sensor.x, state.sensor.y);
+        const f = computeElectricField(state.sensor.x, state.sensor.y);
+        report += `     Posición: (${state.sensor.x.toFixed(3)}, ${state.sensor.y.toFixed(3)}) m\n`;
+        report += `     Potencial V: ${v.toFixed(3)} V\n`;
+        report += `     Campo |E|: ${f.magnitude.toFixed(3)} V/m\n\n`;
+
+        report += `2. RESPUESTAS A LA AUTOEVALUACIÓN:\n`;
+        report += `   - Actividad 1 (Ángulo Campo vs Equipotenciales): ${state.quizAnswers.q1 ? state.quizAnswers.q1.toUpperCase() : 'Sin responder'} (Esperada: C - 90° Perpendiculares)\n`;
+        report += `   - Actividad 2 (Curvatura de V = 0 V): ${state.quizAnswers.q2 ? state.quizAnswers.q2.toUpperCase() : 'Sin responder'} (Esperada: B - Circunferencia de Apolonio envolviendo la carga menor)\n`;
+        report += `   - Actividad 3 (Trabajo W = -q₀ΔV): ${state.quizAnswers.q3 ? state.quizAnswers.q3.toUpperCase() : 'Sin responder'} (Esperada: A - W = 0 J)\n\n`;
+
+        report += `3. CONCLUSIÓN CIENTÍFICA:\n`;
+        report += `   El campo electrostático es un campo conservativo gradiente: E = -∇V.\n`;
+        report += `   Las líneas de fuerza indican la dirección de máximo descenso de potencial,\n`;
+        report += `   garantizando la perpendicularidad estricta con las curvas equipotenciales.\n`;
+
+        const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `reporte_campo_electrico_${Date.now()}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+
+      // Exportar captura PNG del lienzo
+      document.getElementById('btn-export-img').addEventListener('click', () => {
+        const link = document.createElement('a');
+        link.download = `simulacion_campo_electrico_${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      });
+    }
+
+    // ==========================================================================
+    // INICIALIZACIÓN GENERAL Y LISTENERS DE UI
+    // ==========================================================================
+    function init() {
+      window.addEventListener('resize', resizeCanvas);
+      resizeCanvas();
+      setupPointerInteractions();
+      setupPresets();
+      setupWorkTool();
+      setupQuizActivities();
+      setupExportTools();
+
+      // Botones de agregar carga
+      document.getElementById('btn-add-pos').addEventListener('click', () => addCharge(2));
+      document.getElementById('btn-add-neg').addEventListener('click', () => addCharge(-2));
+
+      // Slider de magnitud de carga seleccionada
+      chargeSlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        const c = getSelectedCharge();
+        if (c) {
+          c.q = val;
+          inspectorValText.textContent = `${val > 0 ? '+' : ''}${val} nC`;
+          if (val >= 0) {
+            inspectorBadge.className = 'charge-badge positive';
+            inspectorBadge.textContent = `+${val} nC`;
+          } else {
+            inspectorBadge.className = 'charge-badge negative';
+            inspectorBadge.textContent = `${val} nC`;
+          }
+          updateStats();
+          requestRender();
+        }
+      });
+
+      // Eliminar carga seleccionada
+      btnDeleteSelected.addEventListener('click', deleteSelectedCharge);
+
+      // Limpiar canvas completo
+      document.getElementById('btn-clear-canvas').addEventListener('click', () => {
+        state.charges = [];
+        state.selectedChargeId = null;
+        selectCharge(null);
+        updateStats();
+        requestRender();
+      });
+
+      // Controles de zoom
+      document.getElementById('btn-zoom-in').addEventListener('click', () => applyZoom(1.2));
+      document.getElementById('btn-zoom-out').addEventListener('click', () => applyZoom(0.8));
+      document.getElementById('btn-reset-view').addEventListener('click', () => {
+        state.panX = 0;
+        state.panY = 0;
+        state.pixelsPerMeter = 300;
+        updateRuler();
+        requestRender();
+      });
+
+      // Toggles de capas
+      document.getElementById('toggle-fieldlines').addEventListener('change', (e) => {
+        state.layers.fieldLines = e.target.checked;
+        requestRender();
+      });
+      document.getElementById('toggle-equipotentials').addEventListener('change', (e) => {
+        state.layers.equipotentials = e.target.checked;
+        requestRender();
+      });
+      document.getElementById('toggle-vectors').addEventListener('change', (e) => {
+        state.layers.vectors = e.target.checked;
+        requestRender();
+      });
+      document.getElementById('toggle-heatmap').addEventListener('change', (e) => {
+        state.layers.heatmap = e.target.checked;
+        requestRender();
+      });
+
+      // Drawer de Guía & Evaluación
+      const guideOverlay = document.getElementById('guide-overlay');
+      const learningDrawer = document.getElementById('learning-drawer');
+      const btnOpenGuide = document.getElementById('btn-open-guide');
+      const btnCloseGuide = document.getElementById('btn-close-guide');
+
+      const toggleGuide = (open) => {
+        if (open) {
+          guideOverlay.classList.add('open');
+          learningDrawer.classList.add('open');
+        } else {
+          guideOverlay.classList.remove('open');
+          learningDrawer.classList.remove('open');
+        }
+      };
+
+      btnOpenGuide.addEventListener('click', () => toggleGuide(true));
+      btnCloseGuide.addEventListener('click', () => toggleGuide(false));
+      guideOverlay.addEventListener('click', () => toggleGuide(false));
+
+      // Modal de Despliegue Cloud
+      const deployModal = document.getElementById('deploy-modal');
+      const btnOpenDeploy = document.getElementById('btn-open-deploy');
+      const btnCloseDeploy = document.getElementById('btn-close-deploy');
+
+      btnOpenDeploy.addEventListener('click', () => {
+        guideOverlay.classList.add('open');
+        deployModal.classList.add('open');
+      });
+      btnCloseDeploy.addEventListener('click', () => {
+        guideOverlay.classList.remove('open');
+        deployModal.classList.remove('open');
+      });
+
+      // Mobile Drawer Toggle
+      const mobileBtn = document.getElementById('btn-mobile-sidebar');
+      const sidebar = document.getElementById('sidebar');
+      mobileBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('mobile-open');
+        mobileBtn.textContent = sidebar.classList.contains('mobile-open') ? '✕ Cerrar' : '⚙️ Controles';
+      });
+
+      // Configurar estado inicial: Dipolo clásico
+      addCharge(2, -0.20, 0);
+      addCharge(-2, 0.20, 0);
+
+      // Render inicial de KaTeX si está disponible
+      setTimeout(() => {
+        if (window.katex) {
+          try {
+            katex.render("V(\\mathbf{r}) = k_e \\sum_{i=1}^{N} \\frac{q_i}{|\\mathbf{r} - \\mathbf{r}_i|}", document.getElementById('math-potential'));
+            katex.render("\\mathbf{E}(\\mathbf{r}) = -\\nabla V = k_e \\sum_{i=1}^{N} \\frac{q_i(\\mathbf{r} - \\mathbf{r}_i)}{|\\mathbf{r} - \\mathbf{r}_i|^3}", document.getElementById('math-field'));
+          } catch(e) {
+            console.warn('KaTeX fallback', e);
+          }
+        }
+      }, 300);
+    }
+
+    // Arrancar la aplicación al cargar la ventana
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
